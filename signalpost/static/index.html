@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signalpost · Company intelligence</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand">◈ SIGNALPOST <span>PUBLIC COMPANY INTELLIGENCE</span></div>
+    <h1>Company facts.<br><span>Evidence included.</span></h1>
+    <p>Research Norwegian companies by registration number. Inspect the source behind every fact and track what changes.</p>
+    <p id="source" class="source">Loading source configuration…</p>
+  </header>
+  <main>
+    <section class="panel" aria-labelledby="lookup-title">
+      <h2 id="lookup-title">Research companies</h2>
+      <form id="lookup-form">
+        <label for="numbers">Norwegian organization numbers</label>
+        <textarea id="numbers" rows="3" placeholder="974760673" required aria-describedby="input-help"></textarea>
+        <p id="input-help" class="muted">Nine digits, including the checksum. Separate up to 100 numbers with spaces, commas, or new lines.</p>
+        <div class="actions">
+          <button id="lookup" type="submit">Look up companies</button>
+          <button id="refresh-all" type="button" class="secondary">Refresh saved profiles</button>
+          <button id="export" type="button" class="secondary">Export JSON</button>
+        </div>
+      </form>
+      <p id="notice" role="status" aria-live="polite">Ready. Lookups use saved results; refresh checks the source again.</p>
+    </section>
+    <section aria-labelledby="results-title">
+      <div class="section-heading"><h2 id="results-title">Company profiles</h2><span id="count" class="muted"></span></div>
+      <div id="results"><p class="empty">No profiles yet. Enter a company number above to begin.</p></div>
+    </section>
+  </main>
+  <footer>Public registry facts, not investment advice. Missing fields are not inferred. Local-first · No LLM · No API key</footer>
+</body>
+</html>
