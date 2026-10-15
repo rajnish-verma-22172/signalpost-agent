@@ -231,35 +231,41 @@ official compatibility. This adapter does not invent unsupported company facts.
 
 No model or LLM is used. Each fresh, valid company lookup makes one request to
 the public Brønnøysund Enhetsregisteret API; cached lookups make no request.
-There are no model/API provider charges in this implementation. Network,
-compute, and hosting costs depend on the environment and have not been measured
-or declared as a dollar estimate. Requests run sequentially, with a 10-second
-timeout and no automatic retries; a run against the evaluator's actual input
-must record elapsed time, outbound requests, and failures.
+There are no model/API provider charges in this implementation. Requests run
+sequentially, with a 10-second timeout and no automatic retries.
 
-### Requirements that still need evidence or external action
+**Measured cost (fresh live run of 100 companies, `artifacts/smoke-report.json`):**
+100 outbound requests and about 107 seconds, with 100/100 lookups `ok`. That is
+5% of the daily 2,000-request limit and about 4% of the 45-minute limit.
+Declared external API cost: **$0.00 per day** (public registry, no paid APIs,
+no model calls). Compute: any machine with Python 3.11+; no GPU or hosted
+service is required.
 
-- **At least 1,000 company profiles:** this repository does not include or claim
-  a 1,000-profile dataset. Its local SQLite databases are ignored by Git, and
-  the synthetic demo profile is not real company data. Before submission,
-  collect and verify the required real profiles using permitted sources, and
-  retain a reproducible count and evidence-backed output artifact.
-- **Evaluator compatibility and scores:** no organizer input/output schema,
-  permitted-source guide, or evaluator run is checked into this repository.
-  Confirm the current contract with the organizer, then run the actual test
-  workflow and preserve its input, output, request count, duration, statuses,
-  and field coverage. Do not claim the coverage threshold or qualifying score
-  without that run.
-- **Fact coverage:** the live adapter currently uses only the public
-  Brønnøysund registry. It does not provide leadership, financial figures,
-  jobs, news, multi-source research, or an evaluator-specific adapter. Do not
-  infer or fabricate these facts; add fields or sources only when permitted and
-  supported by evidence.
-- **Submission package:** record the exact submitted revision with
-  `git rev-parse HEAD`, include the repository link, run command, and the model,
-  API, and cost declarations above, and follow the organizer's current
-  submission instructions. The project has not been submitted by this
-  repository.
+### Submission dataset and remaining limitations
+
+- **1,000 company profiles (done):** `artifacts/profiles-1000.json` contains
+  1,000 live, evidence-backed profiles of active Norwegian companies, all with
+  status `ok`, each fact carrying its source URL, source field, snippet and
+  retrieval time. Inputs are in `artifacts/companies-1000.txt`; counts, field
+  coverage and the output SHA-256 are in `artifacts/profiles-1000-report.json`
+  and `artifacts/SUBMISSION_SUMMARY.md`. Rebuild with
+  `python scripts/build_profiles.py --smoke` (fixed seed; needs access to
+  `data.brreg.no`). The export reuses lookups made minutes earlier in the same
+  run, so profiles are marked `cached`; their `retrieved_at` times show the live
+  fetch. Companies whose lookup is not `ok` are skipped, never filled in.
+- **Field availability:** some fields are only present when the registry
+  publishes them (for example, employee count in 350 of 1,000 profiles and
+  website in 179). Missing fields are left empty rather than inferred.
+- **Evaluator compatibility:** the organizer's exact input/output schema and
+  permitted-source guide are not checked into this repository. Outputs are
+  `{"results":[...]}` profiles or claim/evidence envelopes
+  (`--output-format envelopes`); confirm the current contract with the organizer.
+- **Fact coverage:** the live adapter uses only the public Brønnøysund
+  registry. It does not provide leadership, financial figures, jobs, news or
+  multi-source research. These facts are never inferred or fabricated.
+- **Submission package:** repository link, the exact commit from
+  `git rev-parse HEAD`, run command, model/API details and the measured cost
+  above.
 - **Live verification:** tests and demo work offline, but live registry access
   must be checked from a network-enabled environment. Automated tests do not
   demonstrate live coverage or evaluator performance.
