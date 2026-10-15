@@ -27,6 +27,7 @@ class HostingTests(unittest.TestCase):
 
     def start(self, **settings):
         server = make_server(self.service, port=0, **settings)
+        server.daemon_threads = False
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
 
@@ -38,6 +39,11 @@ class HostingTests(unittest.TestCase):
         self.addCleanup(cleanup)
         return server
 
+    def wait_for_workers(self, server):
+        for worker in list(server._threads):
+            worker.join(3)
+            self.assertFalse(worker.is_alive(), "HTTP worker did not finish")
+
     def request(self, server, method="GET", path="/api/config", body=None, **headers):
         connection = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
         try:
@@ -46,6 +52,9 @@ class HostingTests(unittest.TestCase):
             data = response.read()
             if data and response.getheader("Content-Type", "").startswith("application/json"):
                 data = json.loads(data)
+            # Response delivery can precede worker cleanup and slot release.
+            if response.status != 503:
+                self.wait_for_workers(server)
             return response.status, data, dict(response.getheaders())
         finally:
             connection.close()
@@ -230,6 +239,7 @@ class HostingTests(unittest.TestCase):
                                f"Authorization: {basic()}\r\n{extra}\r\n\r\n")
                     connection.sendall(request.encode())
                     self.assertIn(f" {expected} ".encode(), connection.recv(4096))
+                self.wait_for_workers(server)
 
     @unittest.skipUnless(socket.has_ipv6, "IPv6 unavailable")
     def test_ipv6_loopback_defaults(self):
