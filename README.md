@@ -205,22 +205,64 @@ node --check signalpost/static/app.js
 node --test tests/dashboard.test.cjs
 ```
 
-## Submission checklist and honest limits
+## Hackathon submission readiness
 
-- Record the reviewed commit with `git rev-parse HEAD`.
-- Run the automated tests, then demonstrate lookup → evidence → unchanged
-  refresh → JSON export using the dashboard.
-- Run a live batch against the organizer's actual evaluation input, keep its JSON
-  output, and record wall time, request count, statuses, and field coverage.
-  No 100-company benchmark or live coverage score is claimed here.
-- Verify the organizer's current permitted-source guide, evaluation schema,
-  deadline, and submission channel. This repo's JSON API is an MVP interface,
-  **not a verified implementation of an unavailable evaluator contract**.
-- Registry-only coverage does not include leadership, financial figures, jobs,
-  news, multi-source synthesis, or an evaluator-specific adapter. Those are
-  extensions, not fabricated MVP data.
-- Automated tests and offline demo work without network access. The development
-  sandbox could not resolve `data.brreg.no`, so live retrieval must be verified
-  on a network-enabled machine before submission.
-- No public deployment has been provisioned and no entry has been submitted.
-  This repository is the runnable review deliverable, not a submission receipt.
+This section maps the requirements in the supplied Signalpost challenge listing
+to what this repository can demonstrate. A working local MVP is not, by itself,
+proof that an entry meets the evaluator's coverage, accuracy, or execution
+thresholds.
+
+### Run command and declared costs
+
+From the repository root, the one-command local dashboard launch is:
+
+```sh
+python -m signalpost serve
+```
+
+It requires Python 3.11+ and network access to `data.brreg.no` for live lookup.
+The CLI also supports up to 100 positional numbers per invocation and writes a
+`{"results":[...]}` JSON object to stdout; it does not accept an evaluator input
+file or read numbers from stdin. The HTTP API accepts up to 100 numbers in
+`{"numbers":[...]}` and returns `{"results":[...]}`. Neither format is confirmed
+as the organizer's evaluator contract.
+
+No model or LLM is used. Each fresh, valid company lookup makes one request to
+the public Brønnøysund Enhetsregisteret API; cached lookups make no request.
+There are no model/API provider charges in this implementation. Network,
+compute, and hosting costs depend on the environment and have not been measured
+or declared as a dollar estimate. Requests run sequentially, with a 10-second
+timeout and no automatic retries; a run against the evaluator's actual input
+must record elapsed time, outbound requests, and failures.
+
+### Requirements that still need evidence or external action
+
+- **At least 1,000 company profiles:** this repository does not include or claim
+  a 1,000-profile dataset. Its local SQLite databases are ignored by Git, and
+  the synthetic demo profile is not real company data. Before submission,
+  collect and verify the required real profiles using permitted sources, and
+  retain a reproducible count and evidence-backed output artifact.
+- **Evaluator compatibility and scores:** no organizer input/output schema,
+  permitted-source guide, or evaluator run is checked into this repository.
+  Confirm the current contract with the organizer, then run the actual test
+  workflow and preserve its input, output, request count, duration, statuses,
+  and field coverage. Do not claim the coverage threshold or qualifying score
+  without that run.
+- **Fact coverage:** the live adapter currently uses only the public
+  Brønnøysund registry. It does not provide leadership, financial figures,
+  jobs, news, multi-source research, or an evaluator-specific adapter. Do not
+  infer or fabricate these facts; add fields or sources only when permitted and
+  supported by evidence.
+- **Submission package:** record the exact submitted revision with
+  `git rev-parse HEAD`, include the repository link, run command, and the model,
+  API, and cost declarations above, and follow the organizer's current
+  submission instructions. The project has not been submitted by this
+  repository.
+- **Live verification:** tests and demo work offline, but live registry access
+  must be checked from a network-enabled environment. Automated tests do not
+  demonstrate live coverage or evaluator performance.
+- **Deployment:** no public deployment is configured or provisioned. The
+  built-in server is for trusted local use, has no authentication or TLS, and
+  its browser write-origin check accepts only matching HTTP origins. Do not
+  expose it directly to the Internet or claim hosted HTTPS support without
+  suitable deployment controls and verification.
