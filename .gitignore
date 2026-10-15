@@ -1,6 +1,14 @@
 # Byte-compiled / optimized / DLL files
 data/
-artifacts/
+artifacts/*
+# Submission dataset produced by scripts/build_profiles.py is committed on purpose.
+!artifacts/companies-1000.txt
+!artifacts/profiles-1000.json
+!artifacts/profiles-1000-report.json
+!artifacts/smoke-100.txt
+!artifacts/smoke-results.json
+!artifacts/smoke-report.json
+!artifacts/SUBMISSION_SUMMARY.md
 *.sqlite3
 *.sqlite3-*
 __pycache__/

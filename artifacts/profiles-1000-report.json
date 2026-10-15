@@ -1,0 +1,36 @@
+{
+  "source": "Brønnøysund Register Centre — Enhetsregisteret",
+  "run_id": "9876d751-c145-4df7-a08f-20540e494c78",
+  "started_at": "2026-10-15T18:55:31.550795+00:00",
+  "completed_at": "2026-10-15T18:55:31.704075+00:00",
+  "output_format": "profiles",
+  "input_sha256": "67fb30635475e16a32fee646af2e94ffd2302fd476924101893519b4fc416dae",
+  "output_sha256": "91825c4331b13da8d51bb8fbcaf27bafd57212899b9bd6e4d39dacd36b25464b",
+  "input_count": 1000,
+  "output_count": 1000,
+  "request_count": 0,
+  "max_seconds": 3600,
+  "refresh": false,
+  "smoke": false,
+  "statuses": {
+    "ok": 1000
+  },
+  "failures": [],
+  "field_coverage": {
+    "bankrupt": 1000,
+    "business_address": 1000,
+    "founded": 950,
+    "in_liquidation": 1000,
+    "industry": 1000,
+    "latest_accounts_year": 944,
+    "name": 1000,
+    "organization_form": 1000,
+    "registered": 1000,
+    "registration_number": 1000,
+    "vat_registered": 1000,
+    "employees": 350,
+    "postal_address": 250,
+    "website": 179
+  },
+  "runtime_seconds": 0.19041604199992435
+}
