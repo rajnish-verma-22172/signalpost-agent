@@ -35,9 +35,18 @@ class HTTPIntegrationTests(unittest.TestCase):
             data = response.read()
             if response.getheader("Content-Type", "").startswith("application/json"):
                 data = json.loads(data)
+            # Response delivery can precede worker cleanup and slot release;
+            # wait so the next request in the same test never sees a spurious 503.
+            if response.status != 503:
+                self.wait_for_workers()
             return response.status, data, dict(response.getheaders())
         finally:
             connection.close()
+
+    def wait_for_workers(self):
+        for worker in list(getattr(self.server, "_threads", None) or []):
+            worker.join(3)
+            self.assertFalse(worker.is_alive(), "HTTP worker did not finish")
 
     def post(self, path, data):
         return self.request("POST", path, json.dumps(data), {"Content-Type": "application/json"})
