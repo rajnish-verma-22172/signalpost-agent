@@ -70,6 +70,9 @@ class HTTPIntegrationTests(unittest.TestCase):
         _, config, _ = self.request("GET", "/api/config")
         self.assertEqual(config["source"], self.source.name)
         self.assertEqual(config["max_batch"], 100)
+        self.assertEqual(config["max_concurrent"], 2)
+        self.assertEqual(config["max_body_bytes"], 32768)
+        self.assertEqual(config["request_timeout"], 15)
 
     def test_bad_requests_are_explicit_and_do_not_call_source(self):
         for data in ({}, [], {"numbers": []}, {"numbers": [123]}, {"numbers": [NUMBER] * 101}):
@@ -86,6 +89,7 @@ class HTTPIntegrationTests(unittest.TestCase):
             headers = {"Content-Type": "application/json", **extra}
             self.assertEqual(self.request("POST", "/api/lookup", body, headers)[0], 403)
         self.assertEqual(self.request("GET", "/", headers={"Host": "evil.example"})[0], 403)
+        self.assertEqual(self.request("GET", "/api/companies", headers={"Origin": "https://evil.example"})[0], 403)
         for path in ("/../source.py", "/api/companies/unknown", "/no-such-file"):
             self.assertEqual(self.request("GET", path)[0], 404)
         self.assertEqual(self.post("/no-such-route", {})[0], 404)

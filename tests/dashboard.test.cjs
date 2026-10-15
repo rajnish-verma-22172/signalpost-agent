@@ -4,7 +4,7 @@ const path = require("node:path");
 const {test} = require("node:test");
 const vm = require("node:vm");
 
-async function dashboard(failSecondBatch = false) {
+async function dashboard(failSecondBatch = false, maxBatch = 100) {
   const nodes = new Map();
   const requests = [];
   const context = vm.createContext({
@@ -18,7 +18,7 @@ async function dashboard(failSecondBatch = false) {
       querySelectorAll() { return []; }
     },
     async fetch(url, options) {
-      if (url === "/api/config") return {ok: true, json: async () => ({source: "Test fixture"})};
+      if (url === "/api/config") return {ok: true, json: async () => ({source: "Test fixture", max_batch: maxBatch})};
       if (url === "/api/companies") return {ok: true, json: async () => ({companies: []})};
       const numbers = JSON.parse(options.body).numbers;
       requests.push({url, numbers});
@@ -63,4 +63,14 @@ test("ordinary lookup rejects more than 100 inputs without a request", async () 
   await vm.runInContext("run(Array.from({length: 101}, (_, i) => String(i)))", context);
   assert.equal(requests.length, 0);
   assert.match(notice.textContent, /at most 100/);
+});
+
+test("dashboard respects a smaller configured server batch limit", async () => {
+  const {context, requests, notice} = await dashboard(false, 2);
+  await vm.runInContext('run(["1", "2", "3"])', context);
+  assert.equal(requests.length, 0);
+  assert.match(notice.textContent, /at most 2/);
+  await vm.runInContext('run(["1", "2", "3", "4", "5"], true)', context);
+  assert.deepEqual(requests.map(request => request.numbers.length), [2, 2, 1]);
+  assert.equal(vm.runInContext("profiles.length", context), 5);
 });
