@@ -3,6 +3,7 @@
 const $ = (selector) => document.querySelector(selector);
 let profiles = [];
 let busy = false;
+let maxBatch = 100;
 const labels = {
   registration_number: "Registration number", name: "Company name",
   organization_form: "Organization form", business_address: "Business address",
@@ -118,8 +119,8 @@ async function run(numbers, refresh = false) {
     $("#notice").textContent = "Enter at least one registration number, or look up profiles before refreshing.";
     return;
   }
-  if (!refresh && numbers.length > 100) {
-    $("#notice").textContent = "Please submit at most 100 numbers at a time.";
+  if (!refresh && numbers.length > maxBatch) {
+    $("#notice").textContent = `Please submit at most ${maxBatch} numbers at a time.`;
     return;
   }
   setBusy(true);
@@ -127,8 +128,8 @@ async function run(numbers, refresh = false) {
   let completed = 0;
   let verified = 0;
   try {
-    for (let offset = 0; offset < numbers.length; offset += 100) {
-      const data = await api(refresh ? "/api/refresh" : "/api/lookup", {numbers: numbers.slice(offset, offset + 100)});
+    for (let offset = 0; offset < numbers.length; offset += maxBatch) {
+      const data = await api(refresh ? "/api/refresh" : "/api/lookup", {numbers: numbers.slice(offset, offset + maxBatch)});
       const updated = new Map(profiles.map((profile) => [profile.registration_number, profile]));
       data.results.forEach((profile) => updated.set(profile.registration_number, profile));
       profiles = [...updated.values()];
@@ -163,6 +164,9 @@ async function initialize() {
   setBusy(true);
   try {
     const [config, saved] = await Promise.all([api("/api/config"), api("/api/companies")]);
+    if (Number.isInteger(config.max_batch) && config.max_batch >= 1 && config.max_batch <= 100) {
+      maxBatch = config.max_batch;
+    }
     $("#source").textContent = `Source: ${config.source}`;
     profiles = saved.companies;
     render();

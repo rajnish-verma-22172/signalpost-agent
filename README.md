@@ -53,7 +53,8 @@ python -m signalpost --db /tmp/signalpost-review.sqlite3 lookup 974760673
 ```
 
 Output is JSON on stdout, suitable for redirecting to an output file. A batch
-contains 1–100 string inputs; duplicates are trimmed and processed once. Invalid
+contains 1–10,000 string inputs; each input gets an ordered result. Duplicates are
+trimmed and fetched once per batch, even with `--refresh`. Invalid
 numbers do not trigger requests and do not get persisted. Lookup failures are
 per-company results, not batch-wide errors; the CLI exits normally so the entire
 result set remains usable. Invalid batch arguments produce a nonzero exit.
@@ -62,7 +63,9 @@ Normal lookup reuses saved results, **including saved failures**. Use `--refresh
 or the UI refresh buttons to retry. There is no automatic expiry or background
 refresh. Each fresh valid lookup makes one outbound request with a 10-second
 timeout, a 2 MB response limit, and no redirects or automatic retries. Batches
-run sequentially to limit source load; 100 timeouts can take about 17 minutes.
+run sequentially to limit source load. `lookup --max-seconds 300` (the default)
+stops starting new lookups after its time budget; unattempted rows get explicit
+`failed` results, not invented facts. An in-flight lookup is allowed to finish.
 There are no model/API charges; network or hosting costs are environment-specific.
 
 ### HTTP API
@@ -175,13 +178,12 @@ Dashboard or CLI
   modes at the same file. Back up the database while the server is stopped.
   Delete it to reset local state.
 
-The server is intended for **trusted local use**, bound to loopback by default.
-It rejects cross-origin writes and untrusted Host headers, limits JSON request
-size, escapes source content via DOM text nodes, and restricts navigable evidence
-links to the official source. It has no authentication, TLS, multi-worker job
-queue, cancellation, or production resource controls. Do not expose it directly
-to the Internet. A hosted deployment needs an authenticated TLS reverse proxy,
-compatible Host/origin configuration, persistent storage, and workload limits.
+The server is **loopback-first**. Local use needs no authentication. Hosted use
+requires explicit Host/origin allowlists and an authentication secret; see the
+deployment steps below. It limits request bodies, batch sizes and simultaneous
+connections, escapes source content via DOM text nodes, and restricts navigable
+evidence links to the official source. TLS must terminate at a reverse proxy.
+There is no background job queue or multi-user account system.
 
 ## Tests and review
 
@@ -221,11 +223,11 @@ python -m signalpost serve
 ```
 
 It requires Python 3.11+ and network access to `data.brreg.no` for live lookup.
-The CLI also supports up to 100 positional numbers per invocation and writes a
-`{"results":[...]}` JSON object to stdout; it does not accept an evaluator input
-file or read numbers from stdin. The HTTP API accepts up to 100 numbers in
-`{"numbers":[...]}` and returns `{"results":[...]}`. Neither format is confirmed
-as the organizer's evaluator contract.
+For file evaluation, use the command below. The CLI supports up to 10,000 rows;
+the interactive HTTP API remains limited to 100 numbers by default. Both return
+`{"results":[...]}`. The organizer's downloadable contract was not available in
+this environment: confirm its exact schema and required fields before claiming
+official compatibility. This adapter does not invent unsupported company facts.
 
 No model or LLM is used. Each fresh, valid company lookup makes one request to
 the public Brønnøysund Enhetsregisteret API; cached lookups make no request.
@@ -261,8 +263,170 @@ must record elapsed time, outbound requests, and failures.
 - **Live verification:** tests and demo work offline, but live registry access
   must be checked from a network-enabled environment. Automated tests do not
   demonstrate live coverage or evaluator performance.
-- **Deployment:** no public deployment is configured or provisioned. The
-  built-in server is for trusted local use, has no authentication or TLS, and
-  its browser write-origin check accepts only matching HTTP origins. Do not
-  expose it directly to the Internet or claim hosted HTTPS support without
-  suitable deployment controls and verification.
+- **Deployment:** the configuration below is provided, but no hosting account
+  has been provisioned and no public live URL is claimed.
+
+### Evaluator: exact command
+
+Save the organizer's supplied file locally, then run from the repository root:
+
+```sh
+python -m signalpost --db data/evaluation.sqlite3 evaluate \
+  --input /absolute/path/to/companies.csv \
+  --output artifacts/results.jsonl --output-format envelopes \
+  --report artifacts/report.json \
+  --max-seconds 1800
+```
+
+No installation or API key is needed. Supported UTF-8 input formats:
+
+- `.csv`: header plus one company per row.
+- `.json`: an array, or `{"organisation_numbers":[...]}`,
+  `{"companies":[...]}` / `{"numbers":[...]}`.
+- `.jsonl`: one JSON company object or registration-number string per line.
+- `.txt`: one registration number per line (internal blank rows are invalid).
+
+Rows can be registration-number strings, integers, or objects with
+`organisation_number`, `registration_number`, `organization_number`,
+`organisasjonsnummer`, or `orgnr`.
+For another column/key, append `--number-field YOUR_COLUMN`. Names alone cannot
+be resolved by this registry-number pipeline and return `invalid`. A structurally
+invalid file, empty file, more than 10,000 rows, or a file over 20 MB is rejected
+with exit code 2. All parsed rows, including malformed company objects and
+duplicates, retain their position via zero-based `input_index` and original
+`input` in the output. Company failures do not abort the batch.
+
+Each result contains the existing profile, evidence, history, `cached` and
+`stale` flags. States remain `ok`, `invalid`, `missing`, `ambiguous`, `blocked`,
+or `failed`. Check status before using facts: failed refreshes can contain
+explicitly stale last-known facts. Fresh source requests are the default;
+`--use-cache` opts into stored results (including failures). Evaluation exits 0
+when artifacts are written, **not** when all companies succeed; inspect the report.
+Output/report/database/input paths must differ. Keep artifacts outside source
+control; they include the original input and any returned public company data.
+
+`--output-format profiles` (the default) produces the dashboard-compatible JSON
+wrapper. `--output-format envelopes` produces one JSONL terminal envelope per
+input with `organisation_number`, run timestamps/ID, claims, evidence, changes,
+errors and the original `profile`. Claims distinguish `available`,
+`not_available`, `blocked`, `ambiguous`, and `failed`; absent values remain null,
+never invented zeroes. Unsuccessful refreshes do not promote stale profile facts
+to available claims. Evidence includes the retrieved field snippet and its
+SHA-256 (a **field-level snapshot**, not the full HTTP response). Each envelope's
+`terminal_status: completed` means processing ended, not that lookup succeeded;
+inspect `errors`, availability and `profile.status`. Operations are measured at
+batch level in the report, not estimated per duplicate row.
+
+This envelope option follows the general structure in a
+[historical public mirror](https://github.com/biswajeetdev/signalpost-agent/blob/8268bf0e900f4363fd04e25409f974a6e5e96025/starter-kit/signalpost-starter-kit/OUTPUT_CONTRACT.md).
+The mirror's prose and executable starter disagree, and it is not the current
+authenticated contract. Field names, confidence/financial-period requirements,
+and final harness compatibility still need confirmation against the organizer's
+actual files. No evaluator scores or unsupported source coverage are claimed.
+
+Budgets accept 0–86,400 seconds (exclusive of zero). At most one source request
+runs at once per process. Budget checks happen between lookups, not by forcibly
+interrupting a request or SQLite transaction; allow time for an in-flight request,
+database writes and artifact serialization. Registry socket timeout is 10 seconds;
+it is not an end-to-end network deadline. Use the host's process/job timeout for
+a strict wall-clock termination (a forced termination cannot guarantee artifacts).
+Larger files can be split into bounded runs; do not remove failed rows from a report.
+
+### Real 100-company smoke verification
+
+Obtain **100 distinct real, checksum-valid organization numbers** from the
+organizer's permitted input. Do not generate fake numbers or use `--demo`.
+The smoke command validates the count and runs the live pipeline, always fresh:
+
+```sh
+python -m signalpost --db data/smoke.sqlite3 smoke \
+  --input /absolute/path/to/100-companies.csv \
+  --output artifacts/smoke-results.json --report artifacts/smoke-report.json \
+  --max-seconds 1800
+```
+
+Use `--number-field` if needed. Preserve the input, both artifacts, command and
+commit hash. The report records input/output SHA-256, row counts, runtime,
+actual outbound request attempts (including errors), status counts, every
+non-`ok` row and field coverage. A timed-out budget still writes all 100 results
+with explicit failures. Smoke exits **1** if any company is non-`ok`, **2** for
+invalid arguments/input, **0** only for 100 successful results. Request count
+can be below 100 when the budget expires; never present that as a passing run.
+Offline tests exercise this flow with fixtures; **they are not a live report**.
+No genuine 100-company report is bundled: organizer input and live network access
+are required. Review coverage/accuracy against the actual contract separately.
+
+### Deploy safely on Render (persistent service)
+
+You must do these account actions; this repository cannot create a live URL:
+
+1. Merge this change, sign in to Render, create a **Web Service**, and authorize
+   access to this GitHub repository. Select the **Python** runtime, Python 3.11+
+   (for example 3.12), build command `python --version`, start command
+   `python -m signalpost serve`. No pip packages are required.
+2. Choose an instance that supports a persistent disk (not an ephemeral/free
+   filesystem). Add a disk mounted at `/var/lib/signalpost`. Use **one instance**
+   and one process; SQLite is not a shared multi-instance database.
+3. Set these environment variables in the provider's settings, replacing the
+   hostname with the exact assigned service hostname:
+
+   ```text
+   SIGNALPOST_HOST=0.0.0.0
+   SIGNALPOST_DB=/var/lib/signalpost/signalpost.sqlite3
+   SIGNALPOST_ALLOWED_HOSTS=your-service.onrender.com
+   SIGNALPOST_ALLOWED_ORIGINS=https://your-service.onrender.com
+   SIGNALPOST_MAX_BATCH=100
+   SIGNALPOST_MAX_CONCURRENT=2
+   ```
+
+4. Generate a secret locally with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+   Save it as secret environment variable **`SIGNALPOST_AUTH_TOKEN`** in Render.
+   Do not put it in Git, URLs, screenshots, or submission artifacts. Configure
+   the hostname and secret before starting a non-loopback service; missing
+   security configuration deliberately prevents startup.
+5. Render terminates HTTPS. Keep its backend port private and preserve the
+   public Host header. Set the health-check path to `/healthz`. This exact GET
+   path returns only `{"status":"ok"}` without authentication; Host/origin
+   checks still apply. If the provider uses a different probe Host, add that
+   exact value to the Host allowlist, never a wildcard. Protected dashboard/API
+   paths require credentials and must not be used as unauthenticated probes.
+   Set proxy request timeout above the batch budget plus overhead, or use much
+   smaller interactive batches. Run long evaluator jobs via CLI, not the browser.
+6. Open `https://your-service.onrender.com`. At the browser's Basic Auth prompt,
+   use username **`signalpost`** and your secret as password. Check lookup →
+   Evidence → Refresh → Export. Restart the service and confirm saved profiles
+   survive. Only then share this **actual provider-assigned URL** with judges,
+   supplying credentials privately. Use HTTPS only; Basic Auth is not encryption.
+
+Allowed hosts are exact `Host` values, including a port when nonstandard.
+Origins are exact `https://hostname[:port]` values, without paths/trailing slashes.
+Comma-separate multiple values for a custom domain and list both its host and
+origin. No wildcard allowlists or trusted forwarded-header bypasses are provided.
+All dashboard/API resources require authentication when configured; only the
+minimal GET `/healthz` liveness response is public. Credentials
+are not embedded in JavaScript or localStorage. Rotate the shared secret to
+revoke access; browsers may retain Basic Auth until closed. Add proxy rate limits
+and IP restrictions where possible: bounded concurrency is not a distributed
+rate limiter. Hosted HTTP batch cap is configurable only downward from 100.
+
+For another container host, `docker build -t signalpost .` uses the included
+non-root Dockerfile. Mount a persistent volume at `/var/lib/signalpost` writable
+by UID/GID **10001**, pass the same environment variables, set `PORT` if needed,
+and put the container behind an HTTPS proxy. Never expose backend HTTP publicly.
+Back up SQLite with the process stopped before upgrades; do not run evaluation
+and the hosted dashboard against the same database concurrently.
+
+### Final submission checklist
+
+1. Confirm the organizer's **actual** input/output contract, permitted sources,
+   deadline, profile-count requirement, repository access and submission destination.
+2. Run offline tests above, the real smoke command, and the evaluator against the
+   supplied input. Inspect failures and unsupported fields; attach honest reports.
+3. Record `git rev-parse HEAD`, repository link, exact evaluator command, Python
+   version, input/output/report artifacts, and API/model/license/cost declarations.
+   This code is MIT-licensed; it uses the public registry, no models and no paid
+   API. Check registry data licensing/usage terms separately. Actual hosting cost
+   is your selected provider plan, not a measured cost claimed by this project.
+4. Submit through the organizer's confirmed channel. Include a live URL only if
+   you have deployed and tested it; deployment and submission are external actions,
+   not outcomes of automated offline tests.

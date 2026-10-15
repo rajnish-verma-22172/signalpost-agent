@@ -49,12 +49,16 @@ class NoRedirects(HTTPRedirectHandler):
 class RegistrySource:
     name = "Brønnøysund Register Centre — Enhetsregisteret"
 
+    def __init__(self):
+        self.request_count = 0
+
     def fetch(self, number):
         request = Request(BASE_URL + number, headers={
             "Accept": "application/json",
             "User-Agent": "Signalpost-MVP/1.0 (public company registry lookup)",
         })
         try:
+            self.request_count += 1
             with build_opener(NoRedirects).open(request, timeout=10) as response:
                 raw = response.read(2_000_001)
             if len(raw) > 2_000_000:

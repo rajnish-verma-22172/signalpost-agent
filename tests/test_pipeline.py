@@ -134,13 +134,26 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(recovered["stale"])
         self.assertEqual(recovered["status"], "ok")
 
-    def test_batch_isolates_failures_and_deduplicates_numbers(self):
+    def test_batch_preserves_rows_and_deduplicates_requests(self):
         results = self.service.batch([NUMBER, "invalid", f" {NUMBER} "])
-        self.assertEqual([r["status"] for r in results], ["ok", "invalid"])
+        self.assertEqual([r["status"] for r in results], ["ok", "invalid", "ok"])
         self.assertEqual(self.source.calls, 1)
-        for numbers in ([], [NUMBER] * 101, "not a list", [123], ["x" * 101]):
+        for numbers in ([], [NUMBER] * 10_001, "not a list", [123], ["x" * 101]):
             with self.subTest(numbers=numbers), self.assertRaises(ValueError):
                 self.service.batch(numbers)
+
+    def test_large_batch_and_refresh_fetch_duplicates_only_once(self):
+        results = self.service.batch([NUMBER, "invalid"] * 501, refresh=True)
+        self.assertEqual(len(results), 1002)
+        self.assertEqual([r["status"] for r in results], ["ok", "invalid"] * 501)
+        self.assertEqual(self.source.calls, 1)
+
+    def test_budget_exhaustion_keeps_one_result_per_input(self):
+        with patch("signalpost.service.monotonic", side_effect=[0, 0, 2]):
+            results = self.service.batch([NUMBER, "923609016", NUMBER], max_seconds=1)
+        self.assertEqual([r["status"] for r in results], ["ok", "failed", "ok"])
+        self.assertIn("not attempted", results[1]["message"])
+        self.assertEqual(self.source.calls, 1)
 
     def test_truncated_response_is_recorded_and_does_not_abort_batch(self):
         service = Service(self.store, RegistrySource())

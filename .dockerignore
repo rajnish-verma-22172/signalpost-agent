@@ -1,0 +1,6 @@
+**
+!Dockerfile
+!signalpost/
+!signalpost/**
+signalpost/**/__pycache__/
+signalpost/**/*.pyc
