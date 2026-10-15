@@ -1,6 +1,7 @@
 import json
 import socket
 from datetime import datetime, timezone
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -65,7 +66,7 @@ class RegistrySource:
             if exc.code in (401, 403, 429, 451):
                 raise LookupProblem("blocked", "Registry access was denied or rate-limited; try again later.") from exc
             raise LookupProblem("failed", f"Registry returned HTTP {exc.code}.") from exc
-        except (URLError, TimeoutError, socket.timeout, OSError, ValueError) as exc:
+        except (HTTPException, URLError, TimeoutError, socket.timeout, OSError, ValueError) as exc:
             raise LookupProblem("failed", "Registry could not be reached or returned invalid JSON.") from exc
 
 

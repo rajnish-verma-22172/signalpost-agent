@@ -118,18 +118,28 @@ async function run(numbers, refresh = false) {
     $("#notice").textContent = "Enter at least one registration number, or look up profiles before refreshing.";
     return;
   }
+  if (!refresh && numbers.length > 100) {
+    $("#notice").textContent = "Please submit at most 100 numbers at a time.";
+    return;
+  }
   setBusy(true);
   $("#notice").textContent = "Checking companies… Large batches can take several minutes. Keep this page open.";
+  let completed = 0;
+  let verified = 0;
   try {
-    const data = await api(refresh ? "/api/refresh" : "/api/lookup", {numbers});
-    const updated = new Map(profiles.map((profile) => [profile.registration_number, profile]));
-    data.results.forEach((profile) => updated.set(profile.registration_number, profile));
-    profiles = [...updated.values()];
-    render();
-    const verified = data.results.filter((profile) => profile.status === "ok").length;
-    $("#notice").textContent = `Finished ${data.results.length} lookups: ${verified} verified; ${data.results.length - verified} need attention.`;
+    for (let offset = 0; offset < numbers.length; offset += 100) {
+      const data = await api(refresh ? "/api/refresh" : "/api/lookup", {numbers: numbers.slice(offset, offset + 100)});
+      const updated = new Map(profiles.map((profile) => [profile.registration_number, profile]));
+      data.results.forEach((profile) => updated.set(profile.registration_number, profile));
+      profiles = [...updated.values()];
+      completed += data.results.length;
+      verified += data.results.filter((profile) => profile.status === "ok").length;
+      render();
+      $("#notice").textContent = `Checked ${completed} of ${numbers.length} companies…`;
+    }
+    $("#notice").textContent = `Finished ${completed} lookups: ${verified} verified; ${completed - verified} need attention.`;
   } catch (error) {
-    $("#notice").textContent = `Could not complete the request: ${error.message} Saved data has not been cleared.`;
+    $("#notice").textContent = `Could not complete the request: ${error.message} Completed ${completed} lookups. Saved data has not been cleared.`;
   } finally {
     setBusy(false);
   }

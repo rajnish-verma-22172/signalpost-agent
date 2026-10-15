@@ -19,3 +19,5 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Check JavaScript syntax
         run: node --check signalpost/static/app.js
+      - name: Test dashboard batch behavior
+        run: node --test tests/dashboard.test.cjs

@@ -37,6 +37,7 @@ Do not use demo output for an evaluation or submission dataset.
 2. Expand **Evidence** below any field to see its source link, retrieval time,
    exact JSON snippet, and first/last confirmation times.
 3. Click **Refresh this company** or **Refresh saved profiles** to query again.
+   Refreshing saved profiles automatically uses batches of at most 100.
    Expand **Refresh history** for added, updated, and removed fields.
 4. An unsuccessful refresh retains last-known facts with a stale-data warning.
 5. **Export JSON** downloads the currently displayed results and their evidence.
@@ -196,10 +197,12 @@ successful lookup, evidence, identity mismatch, missing fields/records, blocked
 and failed transport, checksums, batch isolation, cache behavior, unchanged
 refresh deduplication, added/changed/removed fields, stale-data retention,
 persistence, HTTP validation, and dashboard delivery. CI runs the same command.
-For an optional JavaScript syntax check, if Node is installed:
+For dashboard batching regression tests and a JavaScript syntax check, use
+**Node.js 18+** (optional for running the app; both checks run in CI):
 
 ```sh
 node --check signalpost/static/app.js
+node --test tests/dashboard.test.cjs
 ```
 
 ## Submission checklist and honest limits

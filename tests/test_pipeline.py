@@ -2,6 +2,7 @@ import copy
 import json
 import tempfile
 import unittest
+from http.client import IncompleteRead
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -141,6 +142,18 @@ class PipelineTests(unittest.TestCase):
             with self.subTest(numbers=numbers), self.assertRaises(ValueError):
                 self.service.batch(numbers)
 
+    def test_truncated_response_is_recorded_and_does_not_abort_batch(self):
+        service = Service(self.store, RegistrySource())
+        with patch("signalpost.source.build_opener") as opener:
+            opener.return_value.open.side_effect = [
+                IncompleteRead(b"partial"),
+                HTTPError(BASE_URL + "923609016", 404, "not found", {}, None),
+            ]
+            results = service.batch([NUMBER, "923609016"])
+        self.assertEqual([result["status"] for result in results], ["failed", "missing"])
+        self.assertEqual(len(self.store.list()), 2)
+        self.assertEqual(results[0]["history"][0]["status"], "failed")
+
     def test_store_persists_across_service_instances(self):
         self.service.lookup(NUMBER)
         other = Service(Store(self.store.path), FakeSource())
@@ -168,7 +181,7 @@ class RegistryTransportTests(unittest.TestCase):
                 self.assertEqual(raised.exception.status, status)
 
     def test_network_and_malformed_responses(self):
-        for error in (URLError("offline"), TimeoutError()):
+        for error in (URLError("offline"), TimeoutError(), IncompleteRead(b"partial")):
             with self.subTest(error=error), patch("signalpost.source.build_opener") as opener:
                 opener.return_value.open.side_effect = error
                 with self.assertRaises(LookupProblem) as raised:
